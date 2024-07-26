@@ -16,9 +16,9 @@
 #define rainSensor 39
 #define floatSwitchPin 22
 
-const char* ssid = "OPPO A53";
-const char* password = "12340986";
-const char* serverName = "http://localhost/flotify/dataHandler.php"; 
+const char* ssid = "PLDTHOMEFIBER_A+";
+const char* password = "Aplus_SOLUTIONS_2023";
+const char* serverName = "http://192.168.1.135/flotify-php/dataHandler.php"; 
 
 DHT dht(DHTPIN, DHTTYPE);
 const int ledPin = 2;
@@ -39,12 +39,12 @@ void setup() {
   pinMode(RX_Ultrasonic, INPUT);
   pinMode(rainSensor, INPUT);
   dht.begin();
-  // WiFi.begin(ssid, password);
-  // while (WiFi.status() != WL_CONNECTED) {
-  //   delay(1000);
-  //   Serial.println("Connecting to WiFi...");
-  // }
-  // Serial.println("Connected to WiFi");
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
+  }
+  Serial.println("Connected to WiFi");
 }
 
 void loop() {
@@ -53,39 +53,35 @@ void loop() {
   float distance = measureDistance();
   int waterLevel = analogRead(WATERSENSOR);
   int floatSwitchState = digitalRead(floatSwitchPin);
-  int rainAnalog = analogRead(rainSensor);
+  int rainVal = map(analogRead(rainSensor), 0, 4095, 0, 1023);
+  float rainAnalog = coeff1 * rainVal * rainVal + coeff2 * rainVal + coeff3;
   String waterLevelIndicator = determineWaterIndicator(floatSwitchState, waterLevel, distance);
   int critPrcnt = calculateCriticalPercentage(waterLevel);
 
-  // if (isnan(temperature) || isnan(humidity)) {
-  //   Serial.println("Failed to read from DHT sensor!");
-  //   return;
-  // }
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
 
-  // if (WiFi.status() == WL_CONNECTED) {
-  //   HTTPClient http;
+    String serverPath = String(serverName) + "?rainAnalog=" + String(rainAnalog)
+                       + "&rainIntensity=" + String(rainAnalog)
+                       + "&waterlevel_ultrasonic=" + String(distance)
+                       + "&waterLevel_indicator=" + waterLevelIndicator
+                       + "&temperature=" + String(temperature)
+                       + "&humidity=" + String(humidity);
 
-  //   String serverPath = String(serverName) + "?rainAnalog=" + String(rainAnalog)
-  //                      + "&rainIntensity=" + String(rainAnalog)
-  //                      + "&waterlevel_ultrasonic=" + String(distance)
-  //                      + "&waterLevel_indicator=" + waterLevelIndicator
-  //                      + "&temperature=" + String(temperature)
-  //                      + "&humidity=" + String(humidity);
+    http.begin(serverPath.c_str());
+    int httpResponseCode = http.GET();
 
-  //   http.begin(serverPath.c_str());
-  //   int httpResponseCode = http.GET();
-
-  //   if (httpResponseCode > 0) {
-  //     Serial.print("HTTP Response code: ");
-  //     Serial.println(httpResponseCode);
-  //   } else {
-  //     Serial.print("Error code: ");
-  //     Serial.println(httpResponseCode);
-  //   }
-  //   http.end();
-  // } else {
-  //   Serial.println("WiFi Disconnected");
-  // }
+    if (httpResponseCode > 0) {
+      Serial.print("HTTP Response code: ");
+      Serial.println(httpResponseCode);
+    } else {
+      Serial.print("Error code: ");
+      Serial.println(httpResponseCode);
+    }
+    http.end();
+  } else {
+    Serial.println("WiFi Disconnected");
+  }
 
   Serial.println(waterLevelIndicator);
   printReadings(distance, critPrcnt, waterLevel);
